@@ -11,12 +11,12 @@
     flex-direction: column;
   }
 
-  /* === LOGIN STYLES (Ваші оригінальні) === */
+  /* === LOGIN STYLES === */
   .login-wrapper {
     flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px;
   }
   .card {
-    background: #fff; padding: 24px 24px 28px; border-radius: 16px;
+    background: #fff; padding: 24px; border-radius: 16px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.08); width: 100%; max-width: 380px; text-align: center;
   }
   .card h2 { margin: 0 0 8px; color: #1f2933; font-size: 22px; font-weight: 600; }
@@ -42,7 +42,7 @@
   .error-text { color: #dc2626; font-size: 13px; min-height: 18px; margin-top: 8px; }
   .hint-text { font-size: 12px; color: #6b7280; margin-top: 4px; min-height: 16px; }
 
-  /* === HEADER (Ваші оригінальні) === */
+  /* === HEADER === */
   header {
     background: #1f2933; color: #fff; height: 56px;
     display: flex; align-items: center; justify-content: space-between;
@@ -66,7 +66,7 @@
 
   .app-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 40px; }
 
-  /* === DASHBOARD GRID (ТЕ, ЩО Я ВИПАДКОВО ВИДАЛИВ — ПОВЕРНУТО) === */
+  /* === DASHBOARD GRID === */
   .dashboard-grid {
     padding: 18px; max-width: 900px; margin: 0 auto;
     display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px;
@@ -85,22 +85,31 @@
   .module-title { font-size: 14px; font-weight: 600; color: #111827; }
   .module-desc { margin-top: 2px; font-size: 11px; color: #6b7280; }
 
-  /* === BELLS MODAL (НОВЕ - ДЛЯ ДЗВІНКІВ) === */
+  /* === BELLS MODAL (ОНОВЛЕНО: Ще вужчий) === */
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.5);
     display: flex; align-items: center; justify-content: center;
     z-index: 2000; backdrop-filter: blur(2px);
   }
   .modal-content {
-    background: white; border-radius: 16px; width: 90%; max-width: 400px;
-    max-height: 80vh; overflow-y: auto;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.3); animation: popIn 0.2s ease-out;
+    background: white; border-radius: 14px;
+    width: 90%; 
+    max-width: 300px; /* Зменшено до 300px для мобільного вигляду */
+    max-height: 70vh; overflow-y: auto;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.3); 
+    animation: popIn 0.2s ease-out;
   }
   @keyframes popIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
   
-  .bells-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  .bells-table th { background: #f3f4f6; padding: 10px; text-align: left; font-weight: 600; border-bottom: 1px solid #e5e7eb; color: #4b5563; }
-  .bells-table td { padding: 10px; border-bottom: 1px solid #f3f4f6; color: #1f2937; }
+  .bells-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .bells-table th { 
+    background: #f9fafb; padding: 8px 10px; /* Менші відступи */
+    text-align: left; font-weight: 600; border-bottom: 1px solid #e5e7eb; color: #6b7280;
+  }
+  .bells-table td { 
+    padding: 8px 10px; /* Менші відступи */
+    border-bottom: 1px solid #f3f4f6; color: #1f2937; 
+  }
   .bells-table tr:last-child td { border-bottom: none; }
 
   /* === TOAST === */

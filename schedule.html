@@ -1,0 +1,305 @@
+<div x-data="scheduleModule()" x-init="init()" style="padding: 20px; max-width: 1100px; margin: 0 auto;">
+
+  <!-- БЛОК РОЗКЛАДУ ДЗВІНКІВ -->
+  <div style="background:white; border-radius:12px; border:1px solid #e5e7eb; padding:16px; margin-bottom:20px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+      <div>
+        <div style="font-size:16px; font-weight:600;">Розклад дзвінків</div>
+        <div style="font-size:12px; color:#6b7280;" x-show="!isAdmin">
+          Редагувати може лише адміністратор
+        </div>
+      </div>
+
+      <template x-if="isAdmin">
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button @click="addBellRow()"
+                  style="padding:7px 10px; border-radius:8px; border:1px solid #d1d5db; background:#f9fafb; cursor:pointer; font-size:12px;">
+            ➕ Додати пару
+          </button>
+          <button @click="saveBells()"
+                  :disabled="savingBells"
+                  style="padding:7px 12px; border-radius:8px; border:none; background:#16a34a; color:white; cursor:pointer; font-size:13px;">
+            <span x-text="savingBells ? '💾 Збереження…' : '💾 Зберегти дзвінки'"></span>
+          </button>
+        </div>
+      </template>
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table style="width:100%; border-collapse:collapse; font-size:13px;">
+        <thead>
+          <tr style="background:#f3f4f6;">
+            <th style="text-align:left; padding:6px; width:60px;">№ пари</th>
+            <th style="text-align:left; padding:6px; width:120px;">Початок</th>
+            <th style="text-align:left; padding:6px; width:120px;">Кінець</th>
+            <th style="text-align:left; padding:6px; width:120px;">Перерва, хв</th>
+            <th style="width:40px;" x-show="isAdmin"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="(b, idx) in bells" :key="idx">
+            <tr>
+              <td style="padding:4px 6px;">
+                <template x-if="isAdmin">
+                  <input type="number"
+                         x-model.number="b.pair_no"
+                         min="1"
+                         style="width:60px; padding:4px 6px; border-radius:6px; border:1px solid #e5e7eb;">
+                </template>
+                <template x-if="!isAdmin">
+                  <span x-text="b.pair_no"></span>
+                </template>
+              </td>
+
+              <td style="padding:4px 6px;">
+                <template x-if="isAdmin">
+                  <input type="text"
+                         x-model="b.start_time"
+                         placeholder="09:00"
+                         style="width:100px; padding:4px 6px; border-radius:6px; border:1px solid #e5e7eb;">
+                </template>
+                <template x-if="!isAdmin">
+                  <span x-text="b.start_time"></span>
+                </template>
+              </td>
+
+              <td style="padding:4px 6px;">
+                <template x-if="isAdmin">
+                  <input type="text"
+                         x-model="b.end_time"
+                         placeholder="10:20"
+                         style="width:100px; padding:4px 6px; border-radius:6px; border:1px solid #e5e7eb;">
+                </template>
+                <template x-if="!isAdmin">
+                  <span x-text="b.end_time"></span>
+                </template>
+              </td>
+
+              <td style="padding:4px 6px;">
+                <template x-if="isAdmin">
+                  <input type="number"
+                         x-model.number="b.break_minutes"
+                         min="0"
+                         style="width:80px; padding:4px 6px; border-radius:6px; border:1px solid #e5e7eb;">
+                </template>
+                <template x-if="!isAdmin">
+                  <span x-text="b.break_minutes"></span>
+                </template>
+              </td>
+
+              <td style="padding:4px 6px; text-align:center;" x-show="isAdmin">
+                <button @click="removeBellRow(idx)"
+                        style="border:none; background:none; cursor:pointer; color:#ef4444; font-size:16px; line-height:1;">
+                  ✖
+                </button>
+              </td>
+            </tr>
+          </template>
+
+          <template x-if="bells.length === 0">
+            <tr>
+              <td colspan="5" style="padding:8px 6px; color:#9ca3af;">Поки що дзвінків немає.</td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+
+  <!-- ФІЛЬТРИ МІЙ РОЗКЛАД -->
+  <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-bottom:16px;">
+    <div>
+      <label style="font-size:12px; color:#6b7280;">Рік</label><br>
+      <input type="number"
+             x-model.number="year"
+             @change="loadSchedule()"
+             style="padding:8px 10px; border-radius:8px; border:1px solid #d1d5db; width:90px;">
+    </div>
+
+    <div>
+      <label style="font-size:12px; color:#6b7280;">Семестр</label><br>
+      <select x-model.number="semester"
+              @change="loadSchedule()"
+              style="padding:8px 10px; border-radius:8px; border:1px solid #d1d5db;">
+        <option :value="1">1 семестр</option>
+        <option :value="2">2 семестр</option>
+      </select>
+    </div>
+
+    <div style="margin-left:auto;">
+      <button @click="loadSchedule()"
+              style="padding:9px 16px; border-radius:8px; border:none; background:#2563eb; color:white; cursor:pointer; font-size:14px;">
+        🔄 Оновити розклад
+      </button>
+    </div>
+  </div>
+
+  <div style="font-size:13px; color:#6b7280; margin-bottom:10px;">
+   Мої заняття: <b x-text="items.length"></b>
+  </div>
+
+  <!-- КАРТКИ ДНІВ ТИЖНЯ -->
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:15px;">
+    <template x-for="day in days" :key="day.value">
+      <div style="background:white; border-radius:12px; border:1px solid #e5e7eb; padding:12px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <div style="font-weight:600; font-size:14px;" x-text="day.label_full"></div>
+        </div>
+
+        <template x-if="lessonsByDay(day.value).length === 0">
+          <div style="font-size:12px; color:#9ca3af;">Немає занять.</div>
+        </template>
+
+        <template x-if="lessonsByDay(day.value).length > 0">
+          <table style="width:100%; border-collapse:collapse; font-size:12px;">
+            <thead>
+              <tr style="background:#f3f4f6;">
+                <th style="text-align:left; padding:4px;">Пара</th>
+                <th style="text-align:left; padding:4px;">Час</th>
+                <th style="text-align:left; padding:4px;">Група</th>
+                <th style="text-align:left; padding:4px;">Дисципліна</th>
+                <th style="text-align:left; padding:4px;">Ауд.</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="les in lessonsByDay(day.value)" :key="les.id">
+                <tr>
+                  <td style="padding:3px 4px;" x-text="les.pair_no"></td>
+                  <td style="padding:3px 4px;" x-text="formatTime(les)"></td>
+                  <td style="padding:3px 4px;" x-text="les.group_name || ('ID ' + les.group_id)"></td>
+                  <td style="padding:3px 4px;">
+                    <div x-text="les.discipline_name || ('ID ' + les.discipline_id)"></div>
+                    <div x-show="les.note" style="color:#6b7280; font-size:11px;" x-text="les.note"></div>
+                  </td>
+                  <td style="padding:3px 4px;" x-text="les.room"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </template>
+      </div>
+    </template>
+  </div>
+
+  <template x-if="loading">
+    <div style="margin-top:15px; font-size:13px; color:#6b7280;">⏳ Завантаження розкладу…</div>
+  </template>
+</div>
+
+<script>
+  function scheduleModule() {
+    return {
+      loading: false,
+      savingBells: false,
+      items: [],
+      bells: [],
+      isAdmin: false,
+      year: new Date().getFullYear(),
+      semester: 1,
+      days: [
+        { value: 1, label_full: 'Понеділок' },
+        { value: 2, label_full: 'Вівторок' },
+        { value: 3, label_full: 'Середа' },
+        { value: 4, label_full: 'Четвер' },
+        { value: 5, label_full: 'Пʼятниця' },
+        { value: 6, label_full: 'Субота' }
+      ],
+
+      init() {
+        this.loadSchedule();
+      },
+
+      // завантажує і МІЙ розклад, і дзвінки, і роль
+      loadSchedule() {
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+          app().showToast("Спочатку увійдіть у систему");
+          return;
+        }
+        this.loading = true;
+        google.script.run.withSuccessHandler((res) => {
+          this.loading = false;
+          if (res && res.success) {
+            this.items = res.items || [];
+            // дзвінки
+            this.bells = (res.bells || []).map(b => ({
+              pair_no: Number(b.pair_no || 0),
+              start_time: b.start_time || '',
+              end_time: b.end_time || '',
+              break_minutes: Number(b.break_minutes || 0)
+            })).sort((a, b) => a.pair_no - b.pair_no);
+            this.isAdmin = (res.role || '').toLowerCase() === 'admin';
+          } else {
+            app().showToast(res && res.msg ? res.msg : "Помилка завантаження");
+          }
+        }).apiGetTeacherSchedule(token, this.year, this.semester);
+      },
+
+      // Фільтр пар по дню
+      lessonsByDay(dayValue) {
+        return this.items.filter(i => Number(i.weekday) === Number(dayValue));
+      },
+
+      formatTime(les) {
+        if (les.time_start && les.time_end) {
+          return les.time_start + '–' + les.time_end;
+        }
+        return '';
+      },
+
+      // ----- Робота з дзвінками (тільки для admin) -----
+      addBellRow() {
+        this.bells.push({
+          pair_no: this.bells.length ? this.bells[this.bells.length - 1].pair_no + 1 : 1,
+          start_time: '',
+          end_time: '',
+          break_minutes: 0
+        });
+      },
+
+      removeBellRow(idx) {
+        this.bells.splice(idx, 1);
+      },
+
+      saveBells() {
+        if (!this.isAdmin) {
+          app().showToast("Тільки адміністратор може змінювати дзвінки");
+          return;
+        }
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+          app().showToast("Спочатку увійдіть у систему");
+          return;
+        }
+
+        // Підготуємо масив без порожніх рядків
+        const payload = this.bells
+          .map((b, i) => ({
+            pair_no: Number(b.pair_no || (i + 1)),
+            start_time: (b.start_time || '').trim(),
+            end_time: (b.end_time || '').trim(),
+            break_minutes: Number(b.break_minutes || 0)
+          }))
+          .filter(b => b.pair_no && b.start_time && b.end_time);
+
+        if (!payload.length) {
+          app().showToast("Немає жодного заповненого дзвінка");
+          return;
+        }
+
+        this.savingBells = true;
+        google.script.run.withSuccessHandler((res) => {
+          this.savingBells = false;
+          if (res && res.success) {
+            app().showToast(res.msg || "Збережено");
+            // перевантажимо, щоб підтягнути те, що записано в таблицю
+            this.loadSchedule();
+          } else {
+            app().showToast(res && res.msg ? res.msg : "Помилка збереження");
+          }
+        }).apiSaveBells(token, payload);
+      }
+    };
+  }
+</script>

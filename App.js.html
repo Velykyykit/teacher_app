@@ -1,12 +1,12 @@
 <script>
-  // Отримуємо модулі з бекенду
-  const SERVER_MODULES = <?!= JSON.stringify(modules || []); ?>;
+  // Тут ми більше не використовуємо < ?!= ... ? >, щоб не було помилки.
+  // Ми беремо дані з глобальної змінної window.SERVER_DATA
   
   function getApp() { return window._app || null; }
 
   function app() {
     return {
-      // STATE (Ваш оригінальний)
+      // STATE
       isLoggedIn: false, loading: false, loginError: '', regError: '', regMsg: '', toastMsg: '',
       user: { id: '', name: '', role: '', permissions: [] }, 
       loginForm: { login: '', pass: '' }, 
@@ -14,10 +14,10 @@
       
       currentView: 'dashboard', pageTitle: 'Головна', history: [],
       
-      // STATE (Новий для дзвінків)
       showBellsModal: false, bellsLoading: false, bellsList: [], bellsFetched: false,
       
-      modules: SERVER_MODULES || [],
+      // Беремо модулі з глобальної змінної
+      modules: (window.SERVER_DATA && window.SERVER_DATA.modules) || [],
 
       registerAppInstance() { window._app = this; },
       
@@ -96,7 +96,7 @@
         return (this.modules || []).filter(m => m.id !== 'dashboard' && this.canAccess(m.id));
       },
 
-      // --- BELLS (Нові функції) ---
+      // --- BELLS ---
       toggleBells() {
         this.showBellsModal = true;
         if(!this.bellsFetched) {

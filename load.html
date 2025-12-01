@@ -1,0 +1,139 @@
+<div x-data="loadPanel()" x-init="init()" style="padding:18px; max-width:900px; margin:0 auto;">
+
+  <!-- Заголовок -->
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <div>
+      <div style="font-size:20px; font-weight:600; color:#111827;">Навантаження викладача</div>
+      <div style="font-size:12px; color:#6b7280; margin-top:2px;">
+        Дані беруться з таблиці <b>load_db</b>.
+      </div>
+    </div>
+
+    <div style="display:flex; align-items:center; gap:6px;">
+      <input type="text"
+             x-model="yearFilter"
+             placeholder="Рік (наприклад 2025/2026 або 2025)"
+             style="padding:6px 8px; border-radius:8px; border:1px solid #d1d5db; font-size:13px; width:160px;">
+      <button @click="loadData()"
+              style="padding:7px 12px; border-radius:8px; border:none; background:#1f2937; color:#fff; font-size:13px; cursor:pointer;">
+        Оновити
+      </button>
+    </div>
+  </div>
+
+  <!-- Помилка -->
+  <div x-show="errorMsg" style="margin-bottom:10px; font-size:12px; color:#b91c1c;" x-text="errorMsg"></div>
+
+  <!-- Таблиця -->
+  <div style="background:#fff; border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 2px 6px rgba(15,23,42,0.05); overflow-x:auto;">
+    <table style="width:100%; border-collapse:collapse; min-width:780px; font-size:13px;">
+      <thead>
+        <tr style="background:#f9fafb; border-bottom:1px solid #e5e7eb;">
+          <th style="padding:8px; text-align:left;">Група</th>
+          <th style="padding:8px; text-align:left;">Дисципліна</th>
+          <th style="padding:8px; text-align:center;">Рік</th>
+
+          <th style="padding:8px; text-align:center;">І семестр (всього)</th>
+          <th style="padding:8px; text-align:center;">І семестр аудиторні</th>
+
+          <th style="padding:8px; text-align:center;">ІІ семестр (всього)</th>
+          <th style="padding:8px; text-align:center;">ІІ семестр аудиторні</th>
+
+          <th style="padding:8px; text-align:center;">Разом годин</th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-if="loading">
+          <tr>
+            <td colspan="8" style="padding:10px; text-align:center; font-size:13px; color:#6b7280;">
+              Завантаження...
+            </td>
+          </tr>
+        </template>
+
+        <template x-if="!loading && items.length === 0">
+          <tr>
+            <td colspan="8" style="padding:10px; text-align:center; font-size:13px; color:#6b7280;">
+              Немає записів навантаження для поточного викладача.
+            </td>
+          </tr>
+        </template>
+
+        <template x-for="row in items" :key="row.id">
+          <tr style="border-top:1px solid #f3f4f6;">
+            <td style="padding:8px;" x-text="row.group_name || ('ID ' + row.group_id)"></td>
+            <td style="padding:8px;" x-text="row.discipline || '-'"></td>
+            <td style="padding:8px; text-align:center;" x-text="row.year"></td>
+
+            <td style="padding:8px; text-align:center;" x-text="row.sem1_total"></td>
+            <td style="padding:8px; text-align:center;" x-text="row.sem1_auditory"></td>
+
+            <td style="padding:8px; text-align:center;" x-text="row.sem2_total"></td>
+            <td style="padding:8px; text-align:center;" x-text="row.sem2_auditory"></td>
+
+            <td style="padding:8px; text-align:center; font-weight:600;" x-text="row.total_hours"></td>
+          </tr>
+        </template>
+      </tbody>
+
+      <!-- Підсумок -->
+      <tfoot x-show="items.length > 0">
+        <tr style="background:#f9fafb; border-top:1px solid #e5e7eb;">
+          <td colspan="7" style="padding:8px; text-align:right; font-weight:600;">Разом годин:</td>
+          <td style="padding:8px; text-align:center; font-weight:700;" x-text="sumTotalHours()"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <script>
+    function loadPanel() {
+      return {
+        items: [],
+        loading: false,
+        errorMsg: '',
+        yearFilter: '',
+
+        init() {
+          this.loadData();
+        },
+
+        loadData() {
+          const token = localStorage.getItem('auth_token') || '';
+          if (!token) {
+            this.errorMsg = 'Немає токена авторизації, спробуйте перелогінитись.';
+            return;
+          }
+
+          this.loading = true;
+          this.errorMsg = '';
+          const self = this;
+
+          google.script.run
+            .withSuccessHandler(function (res) {
+              self.loading = false;
+              if (res && res.success) {
+                self.items = Array.isArray(res.items) ? res.items : [];
+              } else {
+                self.items = [];
+                self.errorMsg = res && res.msg ? res.msg : 'Не вдалося завантажити дані навантаження';
+              }
+            })
+            .withFailureHandler(function (err) {
+              self.loading = false;
+              self.items = [];
+              self.errorMsg = 'Помилка під час завантаження навантаження';
+            })
+            .apiGetTeacherLoad(token, self.yearFilter || '');
+        },
+
+        sumTotalHours() {
+          return this.items.reduce(function (sum, row) {
+            var v = Number(row.total_hours || 0);
+            return sum + (isNaN(v) ? 0 : v);
+          }, 0);
+        }
+      }
+    }
+  </script>
+</div>

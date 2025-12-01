@@ -1,0 +1,225 @@
+<div x-data="studentsPanel()" x-init="init()" style="padding:18px; max-width:1000px; margin:0 auto;">
+
+  <!-- Шапка -->
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+    <div>
+      <div style="font-size:20px; font-weight:600; color:#111827;">База студентів</div>
+      <div style="font-size:12px; color:#6b7280; margin-top:2px;">
+        Перегляд студентів по групах, швидке додавання
+      </div>
+    </div>
+
+    <button class="btn-primary"
+            style="width:auto; padding-inline:14px; display:flex; align-items:center; gap:6px;"
+            :disabled="!selectedGroupId"
+            @click="openCreateStudent()">
+      <span class="material-icons-round" style="font-size:18px;">person_add</span>
+      Новий студент
+    </button>
+  </div>
+
+  <!-- Вибір групи -->
+  <div style="background:#fff; border-radius:12px; border:1px solid #e5e7eb; padding:12px 14px; margin-bottom:12px;">
+    <div style="font-size:12px; color:#6b7280; margin-bottom:6px;">Оберіть групу</div>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <select x-model="selectedGroupId"
+              @change="onGroupChange()"
+              style="flex:1; padding:7px 10px; border-radius:8px; border:1px solid #d1d5db; font-size:14px;">
+        <option value="">— оберіть групу —</option>
+        <template x-for="g in groups" :key="g.id">
+          <option :value="g.id" x-text="g.name || ('Група #' + g.id)"></option>
+        </template>
+      </select>
+
+      <button style="border-radius:8px; border:1px solid #d1d5db; background:#f9fafb; padding:7px 10px; font-size:13px; cursor:pointer;"
+              @click="reloadCurrentGroup()">
+        <span class="material-icons-round" style="font-size:16px; vertical-align:middle;">refresh</span>
+      </button>
+    </div>
+
+    <div style="font-size:11px; color:#9ca3af; margin-top:4px;">
+      <span x-show="selectedGroupName">
+        Вибрана група: <b x-text="selectedGroupName"></b>
+      </span>
+      <span x-show="!selectedGroupId">
+        Спочатку виберіть групу.
+      </span>
+    </div>
+  </div>
+
+  <!-- Таблиця студентів -->
+  <template x-if="selectedGroupId && !loading && students.length === 0">
+    <div style="background:#fff; border-radius:12px; border:1px dashed #d1d5db; padding:12px 14px; font-size:13px; color:#6b7280;">
+      В цій групі ще немає студентів. Додайте першого кнопкою <b>«Новий студент»</b>.
+    </div>
+  </template>
+
+  <template x-if="selectedGroupId && students.length > 0">
+    <div style="background:#fff; border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 2px 6px rgba(15,23,42,0.05); overflow:auto;">
+      <table style="width:100%; border-collapse:collapse; min-width:420px;">
+        <thead>
+          <tr style="background:#f9fafb; border-bottom:1px solid #e5e7eb;">
+            <th style="text-align:left; padding:8px 10px; font-size:11px; text-transform:uppercase; color:#6b7280;">ID</th>
+            <th style="text-align:left; padding:8px 10px; font-size:11px; text-transform:uppercase; color:#6b7280;">ПІБ</th>
+            <th style="text-align:left; padding:8px 10px; font-size:11px; text-transform:uppercase; color:#6b7280;">Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="s in students" :key="s.id">
+            <tr style="border-bottom:1px solid #f3f4f6;">
+              <td style="padding:6px 10px; font-size:13px; color:#4b5563;" x-text="s.id"></td>
+              <td style="padding:6px 10px; font-size:13px; color:#111827;" x-text="s.full_name"></td>
+              <td style="padding:6px 10px; font-size:12px; color:#2563eb;" x-text="s.status || 'active'"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </template>
+
+  <template x-if="!selectedGroupId">
+    <div style="font-size:13px; color:#6b7280; margin-top:8px;">
+      Оберіть групу, щоб побачити список студентів.
+    </div>
+  </template>
+
+  <template x-if="loading">
+    <div style="font-size:13px; color:#6b7280; margin-top:8px;">
+      ⏳ Завантаження...
+    </div>
+  </template>
+
+  <!-- МОДАЛ: НОВИЙ СТУДЕНТ -->
+  <div x-show="showStudentModal"
+       x-transition.opacity
+       style="position:fixed; inset:0; background:rgba(15,23,42,0.5); display:flex; align-items:center; justify-content:center; z-index:1000;"
+       x-cloak>
+    <div style="background:#fff; border-radius:12px; padding:20px 20px 16px; width:340px; max-width:90%; box-shadow:0 15px 40px rgba(0,0,0,0.25);">
+      <div style="font-size:16px; font-weight:600; margin-bottom:4px;">Новий студент</div>
+      <div style="font-size:12px; color:#6b7280; margin-bottom:10px;">
+        Група: <b x-text="selectedGroupName || ('ID ' + selectedGroupId)"></b>
+      </div>
+
+      <input type="text"
+             placeholder="ПІБ студента"
+             x-model="newStudentName"
+             style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid #d1d5db; font-size:14px;">
+
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+        <button @click="showStudentModal=false"
+                style="border:none; background:none; font-size:13px; color:#6b7280; cursor:pointer;">
+          Скасувати
+        </button>
+        <button class="btn-primary"
+                style="width:auto; padding-inline:14px;"
+                :disabled="loading || !newStudentName"
+                @click="createStudent()">
+          <span x-text="loading ? '⏳ Збереження...' : 'Зберегти'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function studentsPanel() {
+      return {
+        groups: [],
+        students: [],
+        selectedGroupId: '',
+        selectedGroupName: '',
+        loading: false,
+
+        showStudentModal: false,
+        newStudentName: '',
+
+        init() {
+          this.loadGroups();
+        },
+
+        // ----- GROUPS -----
+        loadGroups() {
+          const self = this;
+          google.script.run
+            .withSuccessHandler(function(res) {
+              self.groups = Array.isArray(res) ? res : [];
+            })
+            .withFailureHandler(function(err) {
+              const app = getApp();
+              if (app) app.showToast('Помилка завантаження груп');
+            })
+            .apiGetGroups();
+        },
+
+        onGroupChange() {
+          const g = this.groups.find(x => String(x.id) === String(this.selectedGroupId));
+          this.selectedGroupName = g ? (g.name || ('Група #' + g.id)) : '';
+          if (this.selectedGroupId) {
+            this.loadStudents();
+          } else {
+            this.students = [];
+          }
+        },
+
+        reloadCurrentGroup() {
+          if (!this.selectedGroupId) return;
+          this.loadStudents();
+        },
+
+        // ----- STUDENTS -----
+        loadStudents() {
+          if (!this.selectedGroupId) return;
+          const self = this;
+          const app = getApp();
+          this.loading = true;
+
+          google.script.run
+            .withSuccessHandler(function(res) {
+              self.loading = false;
+              if (res && res.success) {
+                self.students = Array.isArray(res.students) ? res.students : [];
+              } else {
+                self.students = [];
+                if (app) app.showToast(res && res.msg ? res.msg : 'Не вдалося завантажити студентів');
+              }
+            })
+            .withFailureHandler(function(err) {
+              self.loading = false;
+              self.students = [];
+              if (app) app.showToast('Помилка завантаження студентів');
+            })
+            .apiGetStudents(this.selectedGroupId);
+        },
+
+        openCreateStudent() {
+          if (!this.selectedGroupId) return;
+          this.newStudentName = '';
+          this.showStudentModal = true;
+        },
+
+        createStudent() {
+          if (!this.newStudentName || !this.selectedGroupId) return;
+          const self = this;
+          const app = getApp();
+          this.loading = true;
+          if (app) app.showToast('Додавання студента...');
+
+          google.script.run
+            .withSuccessHandler(function(res) {
+              self.loading = false;
+              if (app) app.showToast(res && res.msg ? res.msg : 'Студента додано');
+              if (res && res.success) {
+                self.showStudentModal = false;
+                self.newStudentName = '';
+                self.loadStudents();
+              }
+            })
+            .withFailureHandler(function(err) {
+              self.loading = false;
+              if (app) app.showToast('Помилка додавання студента');
+            })
+            .apiCreateStudent(this.newStudentName, this.selectedGroupId);
+        }
+      };
+    }
+  </script>
+</div>

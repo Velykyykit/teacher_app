@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Teacher System</title>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+
+  <?!= include('App.css'); ?>
+</head>
+
+<body x-data="app()" x-init="registerAppInstance(); init()" x-cloak>
+
+  <template x-if="!isLoggedIn">
+    <div class="login-wrapper">
+      <div class="card">
+        <h2 x-text="isRegistering ? 'Реєстрація' : 'Teacher System'"></h2>
+        <div class="card-subtitle" x-show="!isRegistering">Вхід для викладачів та методистів</div>
+        <div class="card-subtitle" x-show="isRegistering">Заявка на доступ до системи</div>
+        
+        <template x-if="!isRegistering">
+          <div>
+            <input type="text" placeholder="📧 Пошта або 📞 Телефон" x-model="loginForm.login" :disabled="loading" @keyup.enter="login()">
+            <input type="password" placeholder="Пароль" x-model="loginForm.pass" :disabled="loading" @keyup.enter="login()">
+            <button class="btn-primary" @click="login()" :disabled="loading">
+               <span x-text="loading ? '⏳ Вхід...' : 'Увійти'"></span>
+            </button>
+            <div class="error-text" x-text="loginError"></div>
+            <button class="btn-link" @click="switchToRegister()">Зареєструватися</button>
+          </div>
+        </template>
+        
+        <template x-if="isRegistering">
+          <div>
+             <input type="text" placeholder="ПІБ" x-model="regForm.name" :disabled="loading">
+             <input type="text" placeholder="📞 Телефон" x-model="regForm.phone" :disabled="loading">
+             <input type="email" placeholder="📧 Пошта" x-model="regForm.email" :disabled="loading">
+             <input type="password" placeholder="Пароль" x-model="regForm.pass" :disabled="loading">
+             <input type="password" placeholder="Повторіть пароль" x-model="regForm.passConfirm" :disabled="loading">
+             
+             <button class="btn-primary" @click="register()" :disabled="loading">
+               <span x-text="loading ? '⏳ Надсилання...' : 'Подати заявку'"></span>
+             </button>
+             
+             <div class="error-text" x-text="regError"></div>
+             <div class="hint-text" x-text="regMsg"></div>
+             <button class="btn-link" @click="switchToLogin()">Повернутися до входу</button>
+          </div>
+        </template>
+      </div>
+    </div>
+  </template>
+
+  <template x-if="isLoggedIn">
+    <div style="display:flex; flex-direction:column; min-height:100vh;">
+      <header>
+        <button class="nav-btn" x-show="history.length > 0" @click="goBack()">
+          <span class="material-icons-round">arrow_back</span>
+        </button>
+        <div style="width:36px;" x-show="history.length === 0"></div>
+
+        <div class="user-info">
+          <div class="user-name" x-text="pageTitle === 'Головна' ? user.name : pageTitle"></div>
+          <div class="user-role" x-show="pageTitle === 'Головна'" x-text="user.role"></div>
+        </div>
+
+        <div style="display:flex; gap:8px;">
+          <button class="nav-btn" @click="toggleBells()" title="Розклад дзвінків">
+            <span class="material-icons-round" style="color:#fff;">schedule</span>
+          </button>
+          
+          <button class="nav-btn" @click="logout()" title="Вихід">
+            <span class="material-icons-round">logout</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="app-body">
+        <template x-if="currentView === 'dashboard'"> <?!= include('dashboard'); ?> </template>
+        <template x-if="currentView === 'groups'"> <?!= include('groups'); ?> </template>
+        <template x-if="currentView === 'students'"> <?!= include('students'); ?> </template>
+        <template x-if="currentView === 'load'"> <?!= include('load'); ?> </template>
+        <template x-if="currentView === 'schedule'"> <?!= include('schedule'); ?> </template>
+        <template x-if="currentView === 'grading'"> <?!= include('grading'); ?> </template>
+      </div>
+    </div>
+  </template>
+
+  <div x-show="showBellsModal" class="modal-overlay" @click.self="showBellsModal = false" x-cloak>
+    <div class="modal-content">
+      <div style="padding:16px; border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center;">
+        <div style="font-size:18px; font-weight:600; color:#111827;">⏰ Розклад дзвінків</div>
+        <button @click="showBellsModal = false" style="background:none; border:none; cursor:pointer; font-size:20px; color:#9ca3af;">✕</button>
+      </div>
+      <div style="padding:0;">
+         <template x-if="bellsLoading"><div style="padding:20px; text-align:center; color:#6b7280;">⏳ Завантаження...</div></template>
+         <template x-if="!bellsLoading && bellsList.length === 0">
+            <div style="padding:20px; text-align:center; color:#6b7280;">Дзвінки не налаштовані</div>
+         </template>
+         <template x-if="!bellsLoading && bellsList.length > 0">
+           <table class="bells-table">
+              <thead>
+                <tr>
+                  <th style="width:40px; text-align:center;">№</th>
+                  <th style="text-align:center;">Час</th> 
+                  <th style="text-align:center;">Перерва</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="b in bellsList" :key="b.pair_no">
+                  <tr>
+                    <td style="text-align:center; font-weight:bold;" x-text="b.pair_no"></td>
+                    <td style="text-align:center;">
+                      <span x-text="b.start_time"></span> – <span x-text="b.end_time"></span>
+                    </td>
+                    <td style="text-align:center;">
+                      <span x-show="b.break_minutes > 0" style="background:#fee2e2; color:#b91c1c; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:bold;">
+                        <span x-text="b.break_minutes"></span> хв
+                      </span>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+           </table>
+         </template>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="toastMsg" class="toast" x-text="toastMsg" x-transition.opacity></div>
+
+  <?!= include('App.js'); ?>
+</body>
+</html>
