@@ -1,14 +1,11 @@
 // ==========================================
-// МОДУЛЬ ГРУП ТА СТУДЕНТІВ
-// db_group  – реєстр груп
-// groups_folder – папка, куди кладемо файли груп
+// МОДУЛЬ ГРУП ТА СТУДЕНТІВ (REFACTORED)
+// Архітектура: Єдина база даних (Single Source of Truth)
+// Працює з таблицями: db_group, db_students, teachers_db
 // ==========================================
 
 /**
  * Повертає список груп з таблиці db_group.
- * Формат елементу:
- * { id, name, course, opp_id, specialty, curator_id, curator_name, id_base, status, year_start }
- *
  * Використовується у фронтенді (groupsPanel).
  */
 function apiGetGroups() {
@@ -21,17 +18,18 @@ function apiGetGroups() {
   var sheet = ss.getSheetByName(CFG['db_group'].sheetName || 'Аркуш1') || ss.getSheets()[0];
   var data = sheet.getDataRange().getValues();
 
-  // Мапа викладачів для імен кураторів
+  // Мапа викладачів для відображення імен кураторів
   var nameMap = _getNameMap(CFG);
 
   var groups = [];
-  // db_group:
-  // A id, B course, C gz, D opp, E specialty, F name,
-  // G education_form, H study_language, I year_start,
-  // J curator_id, K status, L order_create_id, M order_close_id, N id_base
+  // Структура db_group (згідно з вашим CSV):
+  // 0:id, 1:course, 2:gz, 3:opp, 4:specialty, 5:name,
+  // 6:education_form, 7:study_language, 8:year_start,
+  // 9:curator_id, 10:status, 11:order_create_id, 12:order_close_id, 13:id_base
+  
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
-    if (!row[0]) continue; // пропускаємо порожні
+    if (!row[0]) continue; // пропускаємо порожні рядки
 
     var gid = row[0];
     var curatorId = row[9];
@@ -48,8 +46,7 @@ function apiGetGroups() {
       year_start: row[8] || "",
       curator_id: curatorId || "",
       curator_name: curatorId ? (nameMap[curatorId] || "") : "",
-      status: row[10] || "",
-      id_base: row[13] || ""
+      status: row[10] || "active"
     });
   }
 
@@ -58,12 +55,11 @@ function apiGetGroups() {
 
 
 /**
- * Створює нову групу:
- *  - рядок у db_group
- *  - окремий файл-таблицю зі студентами у папці groups_folder
+ * Створює нову групу.
+ * Оновлена логіка: тільки додає запис у db_group.
+ * Файли більше не створюються.
  *
- * groupName – назва групи (наприклад, "ХТ-21")
- * (наразі інші поля заповнюються мінімально, їх можна буде редагувати вручну)
+ * @param {string} groupName – Назва групи (наприклад, "ХТ-21")
  */
 function apiCreateGroup(groupName) {
   if (!groupName) {
@@ -74,9 +70,6 @@ function apiCreateGroup(groupName) {
   if (!CFG['db_group']) {
     return { success: false, msg: "Config error: немає db_group у base_id" };
   }
-  if (!CFG['groups_folder']) {
-    return { success: false, msg: "Config error: немає groups_folder у base_id" };
-  }
 
   var ssDb = SpreadsheetApp.openById(CFG['db_group'].id);
   var sheetDb = ssDb.getSheetByName(CFG['db_group'].sheetName || 'Аркуш1') || ssDb.getSheets()[0];
@@ -86,7 +79,8 @@ function apiCreateGroup(groupName) {
   var newId = 1;
 
   if (lastRow >= 2) {
-    var idValues = sheetDb.getRange(2, 1, lastRow - 1, 1).getValues().flat(); // кол. A
+    // Читаємо колонку A (id)
+    var idValues = sheetDb.getRange(2, 1, lastRow - 1, 1).getValues().flat();
     var numeric = idValues
       .map(function (v) { return Number(v) || 0; })
       .filter(function (v) { return v > 0; });
@@ -96,76 +90,39 @@ function apiCreateGroup(groupName) {
     }
   }
 
+  // ---------- 2. Додаємо рядок у db_group ----------
   try {
-    // ---------- 2. Створюємо нову таблицю для студентів ----------
-    var newSS = SpreadsheetApp.create("Група " + groupName);
-    var newSsId = newSS.getId();
+    var rowData = new Array(14).fill(""); // 14 колонок у структурі CSV
 
-    // Переміщуємо в папку groups_folder
-    var folderId = CFG['groups_folder'].id;
-    var file = DriveApp.getFileById(newSsId);
-    var folder = DriveApp.getFolderById(folderId);
-    folder.addFile(file);
-    // забираємо з кореня, щоб не смітити
-    DriveApp.getRootFolder().removeFile(file);
-
-    // Налаштовуємо лист StudentData
-    var sheet = newSS.getSheets()[0];
-    sheet.setName('StudentData');
-
-    var headers = [
-      "id",
-      "full_name",
-      "birth_date",
-      "gender",
-      "group_id",
-      "education_form",
-      "status",
-      "admission_order",
-      "dismiss_order",
-      "benefits"
-    ];
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sheet.getRange(1, 1, 1, headers.length)
-      .setFontWeight("bold")
-      .setBackground("#cfe2f3");
-
-    // ---------- 3. Додаємо рядок у db_group ----------
-    // Структура: A id, B course, C gz, D opp, E specialty, F name,
-    // G education_form, H study_language, I year_start,
-    // J curator_id, K status, L order_create_id, M order_close_id, N id_base
-
-    var rowData = new Array(14).fill("");
-
-    rowData[0] = newId;               // id
-    rowData[5] = groupName;           // name
-    rowData[8] = (new Date()).getFullYear(); // year_start
-    rowData[10] = "active";           // status
-    rowData[13] = newSsId;            // id_base (файл студентів)
+    rowData[0] = newId;                        // id
+    rowData[5] = groupName;                    // name
+    rowData[8] = (new Date()).getFullYear();   // year_start
+    rowData[10] = "active";                    // status
+    // rowData[13] (id_base) залишаємо пустим, бо ми перейшли на єдину базу
 
     sheetDb.appendRow(rowData);
 
     return {
       success: true,
-      msg: "Групу '" + groupName + "' створено",
-      id: newId,
-      spreadsheetId: newSsId
+      msg: "Групу '" + groupName + "' успішно створено (ID: " + newId + ")",
+      id: newId
     };
 
   } catch (e) {
     return {
       success: false,
-      msg: "Помилка створення групи: " + e.message
+      msg: "Помилка запису в БД: " + e.message
     };
   }
 }
 
 
 /**
- * Додає студента у файл конкретної групи (StudentData).
+ * Додає студента в єдину базу db_students.
+ * Враховує 15 колонок структури CSV.
  *
- * studentName – ПІБ студента
- * groupId     – ID групи з db_group (колонка A)
+ * @param {string} studentName – ПІБ студента
+ * @param {number|string} groupId – ID групи
  */
 function apiCreateStudent(studentName, groupId) {
   if (!studentName || !groupId) {
@@ -173,83 +130,66 @@ function apiCreateStudent(studentName, groupId) {
   }
 
   var CFG = getSystemConfig();
-  if (!CFG['db_group']) {
-    return { success: false, msg: "Config error: немає db_group у base_id" };
+  if (!CFG['db_students']) {
+    return { success: false, msg: "Config error: не знайдено db_students у base_id. Додайте ID таблиці студентів у реєстр." };
   }
 
-  // ---------- 1. Знаходимо файл групи через db_group ----------
-  var ssDb = SpreadsheetApp.openById(CFG['db_group'].id);
-  var sheetDb = ssDb.getSheetByName(CFG['db_group'].sheetName || 'Аркуш1') || ssDb.getSheets()[0];
-  var data = sheetDb.getDataRange().getValues();
+  var ss = SpreadsheetApp.openById(CFG['db_students'].id);
+  var sheet = ss.getSheetByName(CFG['db_students'].sheetName || 'Students') || ss.getSheets()[0];
 
-  var groupSpreadsheetId = null;
+  // ---------- 1. Генеруємо ID студента ----------
+  var lastRow = sheet.getLastRow();
+  var newStudentId = 1;
 
-  for (var i = 1; i < data.length; i++) {
-    var row = data[i];
-    if (row[0] == groupId) {      // A=id
-      groupSpreadsheetId = row[13]; // N=id_base
-      break;
+  if (lastRow >= 2) {
+    var idValues = sheet.getRange(2, 1, lastRow - 1, 1).getValues().flat();
+    var numeric = idValues
+      .map(function (v) { return Number(v) || 0; })
+      .filter(function (v) { return v > 0; });
+
+    if (numeric.length > 0) {
+      newStudentId = Math.max.apply(null, numeric) + 1;
     }
   }
 
-  if (!groupSpreadsheetId) {
-    return { success: false, msg: "Не знайдено файл таблиці для групи ID " + groupId };
-  }
+  // ---------- 2. Підготовка даних ----------
+  var now = new Date();
+  var dateString = Utilities.formatDate(now, "Europe/Kyiv", "dd.MM.yyyy");
 
+  // Структура db_students (15 колонок):
+  // 0:id, 1:full_name, 2:group_id, 3:status, 4:phone, 5:parents_phone, 
+  // 6:email, 7:finance_type, 8:enrollment_date, 9:dismissal_date, 
+  // 10:enrollment_order, 11:dismissal_order, 12:Pass_Hash, 13:Auth_Token, 14:Token_Expire
+
+  var row = new Array(15).fill("");
+  
+  row[0] = newStudentId;
+  row[1] = studentName;
+  row[2] = groupId;
+  row[3] = "active";
+  // row[4] phone - пусте
+  // row[5] parents_phone - пусте
+  // row[6] email - пусте
+  // row[7] finance_type - пусте
+  row[8] = dateString; // enrollment_date
+  
   try {
-    // ---------- 2. Відкриваємо файл групи та лист StudentData ----------
-    var ssGroup = SpreadsheetApp.openById(groupSpreadsheetId);
-    var sheetStudents = ssGroup.getSheetByName('StudentData') || ssGroup.getSheets()[0];
-
-    var lastRow = sheetStudents.getLastRow();
-    var newStudentId = 1;
-
-    if (lastRow >= 2) {
-      var ids = sheetStudents.getRange(2, 1, lastRow - 1, 1).getValues().flat(); // кол. A (id)
-      var numeric = ids
-        .map(function (v) { return Number(v) || 0; })
-        .filter(function (v) { return v > 0; });
-
-      if (numeric.length > 0) {
-        newStudentId = Math.max.apply(null, numeric) + 1;
-      }
-    }
-
-    // ---------- 3. Додаємо рядок студента ----------
-    // Структура StudentData:
-    // 0 id, 1 full_name, 2 birth_date, 3 gender,
-    // 4 group_id, 5 education_form, 6 status,
-    // 7 admission_order, 8 dismiss_order, 9 benefits
-
-    sheetStudents.appendRow([
-      newStudentId,
-      studentName,
-      "",
-      "",
-      groupId,
-      "",
-      "active",
-      "",
-      "",
-      ""
-    ]);
-
+    sheet.appendRow(row);
     return {
       success: true,
-      msg: "Студента додано в групу",
+      msg: "Студента додано до бази",
       id: newStudentId
     };
-
   } catch (e) {
-    return { success: false, msg: "Помилка доступу до файлу групи: " + e.message };
+    return { success: false, msg: "Помилка запису студента: " + e.message };
   }
 }
 
 
 /**
- * Повертає список студентів конкретної групи.
- * Формат:
- * { success:true, students:[ {id, full_name, status, group_id}, ... ] }
+ * Отримує список студентів конкретної групи з єдиної бази db_students.
+ *
+ * @param {number|string} groupId
  */
 function apiGetStudents(groupId) {
   if (!groupId) {
@@ -257,59 +197,44 @@ function apiGetStudents(groupId) {
   }
 
   var CFG = getSystemConfig();
-  if (!CFG['db_group']) {
-    return { success: false, msg: "Config error: немає db_group у base_id" };
+  if (!CFG['db_students']) {
+    // Щоб не ламати інтерфейс, якщо база ще не підключена
+    console.warn("db_students not configured");
+    return { success: true, students: [] };
   }
 
-  var ssDb = SpreadsheetApp.openById(CFG['db_group'].id);
-  var sheetDb = ssDb.getSheetByName(CFG['db_group'].sheetName || 'Аркуш1') || ssDb.getSheets()[0];
-  var data = sheetDb.getDataRange().getValues();
+  var ss = SpreadsheetApp.openById(CFG['db_students'].id);
+  var sheet = ss.getSheetByName(CFG['db_students'].sheetName || 'Students') || ss.getSheets()[0];
+  var data = sheet.getDataRange().getValues();
 
-  var groupSpreadsheetId = null;
-
+  var students = [];
+  
+  // Проходимо по всіх студентах і фільтруємо за group_id (Column C, index 2)
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
-    if (row[0] == groupId) {
-      groupSpreadsheetId = row[13]; // id_base
-      break;
-    }
-  }
-
-  if (!groupSpreadsheetId) {
-    return { success: false, msg: "Не знайдено файл таблиці для групи ID " + groupId };
-  }
-
-  try {
-    var ssGroup = SpreadsheetApp.openById(groupSpreadsheetId);
-    var sheetStudents = ssGroup.getSheetByName('StudentData') || ssGroup.getSheets()[0];
-    var dataSt = sheetStudents.getDataRange().getValues();
-
-    var students = [];
-    for (var j = 1; j < dataSt.length; j++) {
-      var r = dataSt[j];
-      if (!r[0]) continue;
+    // Порівнюємо як рядки, щоб уникнути помилок типів
+    if (String(row[2]) === String(groupId) && row[3] !== 'deleted') {
       students.push({
-        id: r[0],
-        full_name: r[1] || "",
-        birth_date: r[2] || "",
-        gender: r[3] || "",
-        group_id: r[4] || "",
-        status: r[6] || ""
+        id: row[0],
+        full_name: row[1],
+        group_id: row[2],
+        status: row[3],
+        phone: row[4] || "",
+        email: row[6] || "",
+        finance_type: row[7] || ""
       });
     }
-
-    return { success: true, students: students };
-
-  } catch (e) {
-    return { success: false, msg: "Помилка читання студентів: " + e.message };
   }
+
+  return { success: true, students: students };
 }
 
 
 /**
  * Призначає/змінює куратора групи.
- * groupId    – ID групи (db_group.A)
- * teacherId  – ID викладача (teachers_db.A)
+ *
+ * @param {number|string} groupId
+ * @param {number|string} teacherId
  */
 function apiAssignCurator(groupId, teacherId) {
   if (!groupId || !teacherId) {
@@ -326,9 +251,10 @@ function apiAssignCurator(groupId, teacherId) {
   var data = sheetDb.getDataRange().getValues();
 
   var targetRow = -1;
+  // Шукаємо рядок групи
   for (var i = 1; i < data.length; i++) {
     if (data[i][0] == groupId) {
-      targetRow = i + 1; // для setValue
+      targetRow = i + 1; // +1 бо індекси масиву з 0, а рядки в Sheets з 1
       break;
     }
   }
@@ -337,18 +263,24 @@ function apiAssignCurator(groupId, teacherId) {
     return { success: false, msg: "Групу з ID " + groupId + " не знайдено" };
   }
 
-  // Колонка J = curator_id (10-та, але індекс 10, бо A=1)
+  // Колонка J = curator_id (10-та колонка)
   sheetDb.getRange(targetRow, 10).setValue(teacherId);
 
-  return { success: true, msg: "Куратора оновлено" };
+  return { success: true, msg: "Куратора успішно оновлено" };
 }
 
 
 /**
- * Список викладачів для випадаючих списків:
- * [ {id, name}, ... ]
+ * Допоміжна функція: список викладачів для випадаючих списків.
+ * Використовує кешування для швидкодії.
  */
 function apiGetTeachersShort() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get("TEACHERS_SHORT_LIST");
+  if (cached) {
+    return JSON.parse(cached);
+  }
+
   var CFG = getSystemConfig();
   if (!CFG['teachers_db']) {
     return [];
@@ -359,12 +291,16 @@ function apiGetTeachersShort() {
   var data = sheet.getDataRange().getValues();
 
   var list = [];
+  // A=id, B=PIP
   for (var i = 1; i < data.length; i++) {
     if (!data[i][0]) continue;
     list.push({
       id: data[i][0],
-      name: data[i][1] || ""
+      name: data[i][1] || "Unknown"
     });
   }
+
+  // Кешуємо на 1 годину
+  cache.put("TEACHERS_SHORT_LIST", JSON.stringify(list), 3600);
   return list;
 }
