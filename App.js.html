@@ -1,0 +1,117 @@
+<script>
+  // Отримуємо модулі з бекенду
+  const SERVER_MODULES = <?!= JSON.stringify(modules || []); ?>;
+  
+  function getApp() { return window._app || null; }
+
+  function app() {
+    return {
+      // STATE (Ваш оригінальний)
+      isLoggedIn: false, loading: false, loginError: '', regError: '', regMsg: '', toastMsg: '',
+      user: { id: '', name: '', role: '', permissions: [] }, 
+      loginForm: { login: '', pass: '' }, 
+      isRegistering: false, regForm: { name: '', phone: '', email: '', pass: '', passConfirm: '' },
+      
+      currentView: 'dashboard', pageTitle: 'Головна', history: [],
+      
+      // STATE (Новий для дзвінків)
+      showBellsModal: false, bellsLoading: false, bellsList: [], bellsFetched: false,
+      
+      modules: SERVER_MODULES || [],
+
+      registerAppInstance() { window._app = this; },
+      
+      init() {
+        const token = localStorage.getItem('auth_token');
+        if (token) {
+          this.loading = true;
+          google.script.run.withSuccessHandler(res => {
+            this.loading = false;
+            if (res && res.success) this.setUser(res.user); else this.logout();
+          }).apiMe(token);
+        }
+      },
+
+      // --- AUTH ---
+      login() {
+        if (!this.loginForm.login || !this.loginForm.pass) return;
+        this.loading = true; this.loginError = '';
+        google.script.run.withSuccessHandler(res => {
+          this.loading = false;
+          if (res && res.success) {
+            localStorage.setItem('auth_token', res.token);
+            this.setUser(res.user);
+          } else {
+            this.loginError = res ? res.msg : 'Error';
+          }
+        }).apiLogin(this.loginForm.login, this.loginForm.pass);
+      },
+
+      register() {
+        if (this.regForm.pass !== this.regForm.passConfirm) {
+           this.regError = 'Паролі не збігаються'; return;
+        }
+        this.loading = true; this.regError = ''; this.regMsg = '';
+        google.script.run.withSuccessHandler(res => {
+          this.loading = false;
+          if (res && res.success) {
+            this.regMsg = res.msg || 'Заявку подано';
+            const email = this.regForm.email;
+            this.regForm = { name:'', phone:'', email: email, pass:'', passConfirm:'' };
+          } else {
+            this.regError = res ? res.msg : 'Error';
+          }
+        }).apiRegister(this.regForm.name, this.regForm.phone, this.regForm.email, this.regForm.pass);
+      },
+
+      switchToRegister() { this.isRegistering = true; this.loginError = ''; },
+      switchToLogin() { this.isRegistering = false; this.regError = ''; this.regMsg = ''; },
+
+      setUser(u) {
+        this.user = u || {}; this.isLoggedIn = true;
+        this.currentView = 'dashboard'; this.pageTitle = 'Головна'; this.history = [];
+      },
+      logout() {
+        localStorage.removeItem('auth_token'); this.isLoggedIn = false;
+        this.user = {}; this.history = []; this.bellsList = []; this.bellsFetched = false;
+      },
+      
+      // --- NAVIGATION ---
+      navigate(view, title) {
+        this.history.push({view: this.currentView, title: this.pageTitle});
+        this.currentView = view; this.pageTitle = title;
+      },
+      goBack() {
+        const prev = this.history.pop();
+        if(prev) { this.currentView = prev.view; this.pageTitle = prev.title; }
+      },
+      canAccess(moduleId) {
+        if(!this.isLoggedIn) return false;
+        const role = (this.user.role || '').toLowerCase();
+        if(role === 'admin') return true;
+        return (this.user.permissions || []).includes(moduleId) || (this.user.permissions || []).includes('*');
+      },
+
+      visibleModules() {
+        return (this.modules || []).filter(m => m.id !== 'dashboard' && this.canAccess(m.id));
+      },
+
+      // --- BELLS (Нові функції) ---
+      toggleBells() {
+        this.showBellsModal = true;
+        if(!this.bellsFetched) {
+          this.bellsLoading = true;
+          google.script.run.withSuccessHandler(res => {
+            this.bellsLoading = false;
+            if(Array.isArray(res)) {
+              this.bellsList = res.sort((a,b) => (Number(a.pair_no)||0) - (Number(b.pair_no)||0));
+              this.bellsFetched = true;
+            }
+          }).apiGetBells();
+        }
+      },
+
+      showToast(msg) { this.toastMsg = msg; setTimeout(() => this.toastMsg='', 3000); }
+    };
+  }
+</script>

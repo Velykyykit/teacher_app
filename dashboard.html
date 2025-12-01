@@ -1,0 +1,26 @@
+<div style="padding: 18px; max-width: 900px; margin: 0 auto;">
+  <div class="dashboard-grid">
+
+    <template x-for="m in [
+      { id: 'groups',   icon: 'school',                title: 'Групи',        desc: 'Створення груп, студенти, куратори' },
+      { id: 'students', icon: 'group',                 title: 'Студенти',     desc: 'База студентів (перегляд / пошук)' },
+      { id: 'grading',  icon: 'edit_note',             title: 'Журнал',       desc: 'Оцінювання та відвідуваність' },
+      { id: 'schedule', icon: 'calendar_today',        title: 'Розклад',      desc: 'Розклад занять' },
+      { id: 'load',     icon: 'pie_chart',             title: 'Навантаження', desc: 'Години викладачів' },
+      { id: 'admin',    icon: 'admin_panel_settings',  title: 'Адмін панель', desc: 'Ролі, доступи, налаштування' }
+    ]" :key="m.id">
+
+      <div class="module-card"
+           x-show="canAccess(m.id)"
+           @click="navigate(m.id, m.title)">
+
+        <span class="material-icons-round module-icon"
+              x-text="m.icon"></span>
+
+        <div class="module-title" x-text="m.title"></div>
+        <div class="module-desc"  x-text="m.desc"></div>
+      </div>
+    </template>
+
+  </div>
+</div>

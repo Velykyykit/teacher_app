@@ -1,0 +1,254 @@
+<div x-data="gradingPanel()" x-init="init()" style="padding:18px; max-width:600px; margin:0 auto;">
+
+  <!-- Шапка -->
+  <div style="margin-bottom:16px;">
+    <div style="font-size:20px; font-weight:600; color:#111827;">Журнал оцінок</div>
+    <div style="font-size:12px; color:#6b7280; margin-top:2px;">
+      Оберіть групу, студента та тему, потім натисніть оцінку.
+    </div>
+  </div>
+
+  <!-- Блок вибору групи / студента / теми -->
+  <div style="background:#fff; border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 2px 6px rgba(15,23,42,0.05); padding:14px 14px 12px; margin-bottom:14px;">
+
+    <!-- Група -->
+    <div style="margin-bottom:8px;">
+      <div style="font-size:12px; color:#6b7280; margin-bottom:4px;">Група</div>
+      <select x-model="selectedGroupId"
+              @change="onGroupChange()"
+              style="width:100%; padding:7px 10px; border-radius:8px; border:1px solid #d1d5db; font-size:14px;">
+        <option value="">— оберіть групу —</option>
+        <template x-for="g in groups" :key="g.id">
+          <option :value="g.id" x-text="g.name || ('Група #' + g.id)"></option>
+        </template>
+      </select>
+    </div>
+
+    <!-- Студент -->
+    <div style="margin-bottom:8px;">
+      <div style="font-size:12px; color:#6b7280; margin-bottom:4px;">Студент</div>
+      <select x-model="selectedStudentId"
+              :disabled="!selectedGroupId || loadingStudents"
+              style="width:100%; padding:7px 10px; border-radius:8px; border:1px solid #d1d5db; font-size:14px;">
+        <option value="">— оберіть студента —</option>
+        <template x-for="s in students" :key="s.id">
+          <option :value="s.id" x-text="s.full_name"></option>
+        </template>
+      </select>
+      <div style="font-size:11px; color:#9ca3af; margin-top:3px;" x-show="selectedGroupId && loadingStudents">
+        Завантаження студентів...
+      </div>
+    </div>
+
+    <!-- Тема -->
+    <div>
+      <div style="font-size:12px; color:#6b7280; margin-bottom:4px;">Тема / робота</div>
+      <input type="text"
+             x-model="topic"
+             placeholder="Наприклад: Тема 5. Ринкова рівновага"
+             style="width:100%; padding:7px 10px; border-radius:8px; border:1px solid #d1d5db; font-size:14px;">
+    </div>
+
+    <div style="font-size:11px; color:#ef4444; margin-top:6px; min-height:14px;" x-text="errorMsg"></div>
+  </div>
+
+  <!-- Блок вибору оцінки -->
+  <template x-if="selectedStudentId">
+    <div style="background:#fff; border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 2px 6px rgba(15,23,42,0.05); padding:12px 14px;">
+      <div style="font-size:12px; color:#6b7280; margin-bottom:6px;">
+        Оцінка для:
+        <b x-text="currentStudentName()"></b>
+        <span style="color:#9ca3af;"> (</span><span x-text="currentGroupName()" style="font-size:11px; color:#9ca3af;"></span><span style="color:#9ca3af;">)</span>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px;">
+
+        <!-- Високі -->
+        <button @click="send(12)"
+                style="padding:10px 0; border-radius:10px; border:none; cursor:pointer; font-size:15px; font-weight:600; background:#dcfce7; color:#166534;">
+          12
+        </button>
+        <button @click="send(11)"
+                style="padding:10px 0; border-radius:10px; border:none; cursor:pointer; font-size:15px; font-weight:600; background:#dcfce7; color:#166534;">
+          11
+        </button>
+        <button @click="send(10)"
+                style="padding:10px 0; border-radius:10px; border:none; cursor:pointer; font-size:15px; font-weight:600; background:#dcfce7; color:#166534;">
+          10
+        </button>
+        <button @click="send(9)"
+                style="padding:10px 0; border-radius:10px; border:none; cursor:pointer; font-size:15px; font-weight:600; background:#fef9c3; color:#854d0e;">
+          9
+        </button>
+
+        <!-- Середні -->
+        <button @click="send(8)"
+                style="padding:10px 0; border-radius:10px; border:none; cursor:pointer; font-size:15px; font-weight:600; background:#fef9c3; color:#854d0e;">
+          8
+        </button>
+        <button @click="send(7)"
+                style="padding:10px 0; border-radius:10px; border:none; cursor:pointer; font-size:15px; font-weight:600; background:#fef9c3; color:#854d0e;">
+          7
+        </button>
+        <button @click="send(6)"
+                style="padding:10px 0; border-radius:10px; border:none; cursor:pointer; font-size:15px; font-weight:600; background:#fee2e2; color:#b91c1c;">
+          6
+        </button>
+        <button @click="send(5)"
+                style="padding:10px 0; border-radius:10px; border:none; cursor:pointer; font-size:15px; font-weight:600; background:#fee2e2; color:#b91c1c;">
+          5
+        </button>
+
+        <!-- Н (відсутній) -->
+        <button @click="send('Н')"
+                style="grid-column:1 / -1; padding:10px 0; border-radius:10px; border:none; cursor:pointer; font-size:14px; font-weight:600; background:#e5e7eb; color:#374151;">
+          Н (відсутній)
+        </button>
+      </div>
+    </div>
+  </template>
+
+  <template x-if="!selectedStudentId">
+    <div style="font-size:13px; color:#6b7280; margin-top:6px;">
+      Спочатку оберіть групу та студента.
+    </div>
+  </template>
+
+  <script>
+    function gradingPanel() {
+      return {
+        groups: [],
+        students: [],
+        selectedGroupId: '',
+        selectedStudentId: '',
+        selectedGroupObj: null,
+
+        topic: '',
+        errorMsg: '',
+        loadingStudents: false,
+        sending: false,
+
+        init() {
+          this.loadGroups();
+        },
+
+        // ---- GROUPS ----
+        loadGroups() {
+          const self = this;
+          google.script.run
+            .withSuccessHandler(function (res) {
+              self.groups = Array.isArray(res) ? res : [];
+            })
+            .withFailureHandler(function (err) {
+              const app = getApp();
+              if (app) app.showToast('Помилка завантаження груп');
+            })
+            .apiGetGroups();
+        },
+
+        onGroupChange() {
+          const g = this.groups.find(x => String(x.id) === String(this.selectedGroupId));
+          this.selectedGroupObj = g || null;
+          this.selectedStudentId = '';
+          this.students = [];
+          if (this.selectedGroupId) {
+            this.loadStudents();
+          }
+        },
+
+        loadStudents() {
+          if (!this.selectedGroupId) return;
+          const self = this;
+          const app = getApp();
+          this.loadingStudents = true;
+
+          google.script.run
+            .withSuccessHandler(function (res) {
+              self.loadingStudents = false;
+              if (res && res.success) {
+                self.students = Array.isArray(res.students) ? res.students : [];
+              } else {
+                self.students = [];
+                if (app) app.showToast(res && res.msg ? res.msg : 'Не вдалося завантажити студентів');
+              }
+            })
+            .withFailureHandler(function (err) {
+              self.loadingStudents = false;
+              self.students = [];
+              if (app) app.showToast('Помилка завантаження студентів');
+            })
+            .apiGetStudents(this.selectedGroupId);
+        },
+
+        currentGroupName() {
+          return this.selectedGroupObj
+            ? (this.selectedGroupObj.name || ('Група #' + this.selectedGroupObj.id))
+            : '';
+        },
+
+        currentStudent() {
+          if (!this.selectedStudentId) return null;
+          return this.students.find(x => String(x.id) === String(this.selectedStudentId)) || null;
+        },
+
+        currentStudentName() {
+          const s = this.currentStudent();
+          return s ? s.full_name : '';
+        },
+
+        // ---- SEND GRADE ----
+        send(mark) {
+          this.errorMsg = '';
+
+          if (!this.selectedGroupId) {
+            this.errorMsg = 'Оберіть групу';
+            return;
+          }
+          if (!this.selectedStudentId) {
+            this.errorMsg = 'Оберіть студента';
+            return;
+          }
+          if (!this.topic) {
+            this.errorMsg = 'Вкажіть тему / роботу';
+            return;
+          }
+
+          const student = this.currentStudent();
+          if (!student) {
+            this.errorMsg = 'Помилка: студент не знайдений у списку';
+            return;
+          }
+
+          const app = getApp();
+          const token = localStorage.getItem('auth_token') || '';
+
+          const payload = {
+            groupId: this.selectedGroupId,
+            groupName: this.currentGroupName(),
+            studentId: student.id,
+            studentName: student.full_name,
+            topic: this.topic,
+            mark: mark
+          };
+
+          this.sending = true;
+          if (app) app.showToast('Збереження оцінки...');
+
+          google.script.run
+            .withSuccessHandler((res) => {
+              this.sending = false;
+              if (app) app.showToast(res && res.msg ? res.msg : 'Оцінку збережено');
+              if (res && !res.success && res.msg) {
+                this.errorMsg = res.msg;
+              }
+            })
+            .withFailureHandler((err) => {
+              this.sending = false;
+              if (app) app.showToast('Помилка збереження оцінки');
+            })
+            .apiSaveGrade(token, payload);
+        }
+      };
+    }
+  </script>
+</div>

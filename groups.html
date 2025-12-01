@@ -1,0 +1,296 @@
+<div x-data="groupsPanel()" x-init="init()" style="padding:18px; max-width:1000px; margin:0 auto;">
+
+  <!-- Шапка -->
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+    <div>
+      <div style="font-size:20px; font-weight:600; color:#111827;">Навчальні групи</div>
+      <div style="font-size:12px; color:#6b7280; margin-top:2px;">
+        Створення груп, студенти, куратори
+      </div>
+    </div>
+
+    <button class="btn-primary"
+            style="width:auto; padding-inline:14px; display:flex; align-items:center; gap:6px;"
+            @click="openCreateGroup()">
+      <span class="material-icons-round" style="font-size:18px;">add</span>
+      Нова група
+    </button>
+  </div>
+
+  <!-- Сітка карток груп -->
+  <template x-if="groups.length === 0">
+    <div style="font-size:13px; color:#6b7280; padding:12px; background:#fff; border-radius:10px; border:1px dashed #d1d5db;">
+      Ще немає жодної групи. Натисніть <b>«Нова група»</b>, щоб створити першу.
+    </div>
+  </template>
+
+  <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:14px;"
+       x-show="groups.length > 0">
+
+    <template x-for="g in groups" :key="g.id">
+      <div style="background:#fff; border-radius:12px; border:1px solid #e5e7eb; box-shadow:0 2px 6px rgba(15,23,42,0.05); padding:12px 12px 10px; display:flex; flex-direction:column; gap:6px;">
+
+        <!-- Назва, курс -->
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span class="material-icons-round" style="font-size:22px; color:#2563eb;">school</span>
+            <div>
+              <div style="font-weight:600; font-size:15px;" x-text="g.name || ('Група #' + g.id)"></div>
+              <div style="font-size:11px; color:#6b7280;" x-text="g.course ? ('Курс: ' + g.course) : ''"></div>
+            </div>
+          </div>
+
+          <span style="font-size:11px; padding:2px 6px; border-radius:999px; background:#e5f3ff; color:#1d4ed8;"
+                x-text="g.status || 'active'">
+          </span>
+        </div>
+
+        <!-- ОПП / спеціальність -->
+        <div style="font-size:11px; color:#6b7280;">
+          <span x-text="g.specialty || ''"></span>
+          <span x-show="g.opp_id">&nbsp; • ОПП ID: </span>
+          <span x-text="g.opp_id"></span>
+        </div>
+
+        <!-- Рік старту / форма / мова -->
+        <div style="font-size:11px; color:#6b7280;">
+          <span x-show="g.year_start">Набір: <span x-text="g.year_start"></span></span>
+          <span x-show="g.education_form">&nbsp; • <span x-text="g.education_form"></span></span>
+          <span x-show="g.study_language">&nbsp; • <span x-text="g.study_language"></span></span>
+        </div>
+
+        <!-- Куратор -->
+        <div style="margin-top:4px;">
+          <div style="font-size:11px; color:#6b7280; margin-bottom:2px;">Куратор групи</div>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <select x-model="g.curator_id"
+                    @change="updateCurator(g)"
+                    style="flex:1; padding:6px 8px; font-size:12px; border-radius:6px; border:1px solid #d1d5db;">
+              <option value="">— не призначено —</option>
+              <template x-for="t in teachers" :key="t.id">
+                <option :value="t.id" x-text="t.name"></option>
+              </template>
+            </select>
+          </div>
+        </div>
+
+        <!-- Кнопки -->
+        <div style="display:flex; gap:6px; margin-top:8px;">
+          <a :href="g.id_base ? ('https://docs.google.com/spreadsheets/d/' + g.id_base) : '#'"
+             target="_blank"
+             :style="g.id_base
+                     ? 'flex:1; text-align:center; padding:6px; font-size:12px; border-radius:6px; text-decoration:none; background:#e5f3ff; color:#1d4ed8;'
+                     : 'flex:1; text-align:center; padding:6px; font-size:12px; border-radius:6px; text-decoration:none; background:#f3f4f6; color:#9ca3af; pointer-events:none;'">
+            Таблиця
+          </a>
+
+          <button @click="openStudentModal(g)"
+                  style="flex:1; padding:6px; font-size:12px; border-radius:6px; border:none; background:#e7f5e8; color:#166534; cursor:pointer;">
+            + Студент
+          </button>
+        </div>
+
+        <div style="font-size:10px; color:#9ca3af; margin-top:2px;">
+          ID групи: <span x-text="g.id"></span>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- ========== МОДАЛ: НОВА ГРУПА ========== -->
+  <div x-show="showGroupModal"
+       x-transition.opacity
+       style="position:fixed; inset:0; background:rgba(15,23,42,0.5); display:flex; align-items:center; justify-content:center; z-index:1000;"
+       x-cloak>
+    <div style="background:#fff; border-radius:12px; padding:20px 20px 16px; width:340px; max-width:90%; box-shadow:0 15px 40px rgba(0,0,0,0.25);">
+      <div style="font-size:16px; font-weight:600; margin-bottom:10px;">Створити групу</div>
+
+      <input type="text"
+             placeholder="Назва групи (напр. ХТ-21)"
+             x-model="newGroupName"
+             style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid #d1d5db; font-size:14px;">
+
+      <div style="font-size:11px; color:#6b7280; margin-top:4px;">
+        Інші параметри (курс, ОПП, форма) можна буде додати пізніше у таблиці <b>db_group</b>.
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+        <button @click="showGroupModal=false"
+                style="border:none; background:none; font-size:13px; color:#6b7280; cursor:pointer;">
+          Скасувати
+        </button>
+        <button class="btn-primary"
+                style="width:auto; padding-inline:14px;"
+                :disabled="loading || !newGroupName"
+                @click="createGroup()">
+          <span x-text="loading ? '⏳ Створення...' : 'Створити'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== МОДАЛ: ДОДАТИ СТУДЕНТА ========== -->
+  <div x-show="showStudentModal"
+       x-transition.opacity
+       style="position:fixed; inset:0; background:rgba(15,23,42,0.5); display:flex; align-items:center; justify-content:center; z-index:1000;"
+       x-cloak>
+    <div style="background:#fff; border-radius:12px; padding:20px 20px 16px; width:340px; max-width:90%; box-shadow:0 15px 40px rgba(0,0,0,0.25);">
+      <div style="font-size:16px; font-weight:600; margin-bottom:4px;">Додати студента</div>
+      <div style="font-size:12px; color:#6b7280; margin-bottom:10px;">
+        Група: <b x-text="selectedGroup ? (selectedGroup.name || ('#' + selectedGroup.id)) : ''"></b>
+      </div>
+
+      <input type="text"
+             placeholder="ПІБ студента"
+             x-model="newStudentName"
+             style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid #d1d5db; font-size:14px;">
+
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+        <button @click="showStudentModal=false"
+                style="border:none; background:none; font-size:13px; color:#6b7280; cursor:pointer;">
+          Скасувати
+        </button>
+        <button class="btn-primary"
+                style="width:auto; padding-inline:14px;"
+                :disabled="loading || !newStudentName"
+                @click="createStudent()">
+          <span x-text="loading ? '⏳ Додавання...' : 'Зберегти'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function groupsPanel() {
+      return {
+        groups: [],
+        teachers: [],
+        loading: false,
+
+        showGroupModal: false,
+        newGroupName: '',
+
+        showStudentModal: false,
+        newStudentName: '',
+        selectedGroup: null,
+
+        init() {
+          this.loadGroups();
+          this.loadTeachers();
+        },
+
+        // ----- LOAD -----
+        loadGroups() {
+          const self = this;
+          google.script.run
+            .withSuccessHandler(function(res) {
+              self.groups = Array.isArray(res) ? res : [];
+            })
+            .withFailureHandler(function(err) {
+              const app = getApp();
+              if (app) app.showToast('Помилка завантаження груп');
+            })
+            .apiGetGroups();
+        },
+
+        loadTeachers() {
+          const self = this;
+          google.script.run
+            .withSuccessHandler(function(res) {
+              self.teachers = Array.isArray(res) ? res : [];
+            })
+            .withFailureHandler(function(err) {
+              const app = getApp();
+              if (app) app.showToast('Помилка завантаження викладачів');
+            })
+            .apiGetTeachersShort();
+        },
+
+        // ----- CREATE GROUP -----
+        openCreateGroup() {
+          this.newGroupName = '';
+          this.showGroupModal = true;
+        },
+
+        createGroup() {
+          if (!this.newGroupName) return;
+          const self = this;
+          const app = getApp();
+          this.loading = true;
+          if (app) app.showToast('Створення групи...');
+
+          google.script.run
+            .withSuccessHandler(function(res) {
+              self.loading = false;
+              if (app) app.showToast(res && res.msg ? res.msg : 'Групу створено');
+              if (res && res.success) {
+                self.showGroupModal = false;
+                self.newGroupName = '';
+                self.loadGroups();
+              }
+            })
+            .withFailureHandler(function(err) {
+              self.loading = false;
+              if (app) app.showToast('Помилка створення групи');
+            })
+            .apiCreateGroup(this.newGroupName);
+        },
+
+        // ----- STUDENTS -----
+        openStudentModal(group) {
+          this.selectedGroup = group;
+          this.newStudentName = '';
+          this.showStudentModal = true;
+        },
+
+        createStudent() {
+          if (!this.selectedGroup || !this.newStudentName) return;
+          const self = this;
+          const app = getApp();
+          this.loading = true;
+          if (app) app.showToast('Додавання студента...');
+
+          google.script.run
+            .withSuccessHandler(function(res) {
+              self.loading = false;
+              if (app) app.showToast(res && res.msg ? res.msg : 'Студента додано');
+              if (res && res.success) {
+                self.showStudentModal = false;
+                self.newStudentName = '';
+              }
+            })
+            .withFailureHandler(function(err) {
+              self.loading = false;
+              if (app) app.showToast('Помилка додавання студента');
+            })
+            .apiCreateStudent(this.newStudentName, this.selectedGroup.id);
+        },
+
+        // ----- CURATOR -----
+        updateCurator(group) {
+          const app = getApp();
+          if (!group || !group.id) return;
+
+          const groupId = group.id;
+          const teacherId = group.curator_id || '';
+
+          if (app) app.showToast('Збереження куратора...');
+
+          const self = this;
+          google.script.run
+            .withSuccessHandler(function(res) {
+              if (app) app.showToast(res && res.msg ? res.msg : 'Куратора оновлено');
+              if (res && res.success) {
+                const t = self.teachers.find(function(x){ return x.id == teacherId; });
+                group.curator_name = t ? t.name : '';
+              }
+            })
+            .withFailureHandler(function(err) {
+              if (app) app.showToast('Помилка збереження куратора');
+            })
+            .apiAssignCurator(groupId, teacherId);
+        }
+      };
+    }
+  </script>
+</div>
